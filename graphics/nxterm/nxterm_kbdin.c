@@ -450,6 +450,11 @@ void nxterm_kbdin(NXTERM handle, FAR const uint8_t *buffer, uint8_t buflen)
       /* Are there threads waiting for read data? */
 
       sched_lock();
+
+      /* Notify all poll/select waiters that they can read from the FIFO */
+
+      nxterm_pollnotify(priv, POLLIN);
+
       for (i = 0; i < priv->nwaiters; i++)
         {
           /* Yes.. Notify all of the waiting readers that more data is available */
@@ -457,9 +462,6 @@ void nxterm_kbdin(NXTERM handle, FAR const uint8_t *buffer, uint8_t buflen)
           nxsem_post(&priv->waitsem);
         }
 
-      /* Notify all poll/select waiters that they can read from the FIFO */
-
-      nxterm_pollnotify(priv, POLLIN);
       sched_unlock();
     }
 

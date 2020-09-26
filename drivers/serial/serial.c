@@ -1630,6 +1630,10 @@ int uart_register(FAR const char *path, FAR uart_dev_t *dev)
 
 void uart_datareceived(FAR uart_dev_t *dev)
 {
+  /* Notify all poll/select waiters that they can read from the recv buffer */
+
+  uart_pollnotify(dev, POLLIN);
+
   /* Is there a thread waiting for read data?  */
 
   if (dev->recvwaiting)
@@ -1639,10 +1643,6 @@ void uart_datareceived(FAR uart_dev_t *dev)
       dev->recvwaiting = false;
       nxsem_post(&dev->recvsem);
     }
-
-  /* Notify all poll/select waiters that they can read from the recv buffer */
-
-  uart_pollnotify(dev, POLLIN);
 
 #if defined(CONFIG_PM) && defined(CONFIG_SERIAL_CONSOLE)
   /* Call pm_activity when characters are received on the console device */
@@ -1668,6 +1668,10 @@ void uart_datareceived(FAR uart_dev_t *dev)
 
 void uart_datasent(FAR uart_dev_t *dev)
 {
+  /* Notify all poll/select waiters that they can write to xmit buffer */
+
+  uart_pollnotify(dev, POLLOUT);
+
   /* Is there a thread waiting for space in xmit.buffer?  */
 
   if (dev->xmitwaiting)
@@ -1677,10 +1681,6 @@ void uart_datasent(FAR uart_dev_t *dev)
       dev->xmitwaiting = false;
       nxsem_post(&dev->xmitsem);
     }
-
-  /* Notify all poll/select waiters that they can write to xmit buffer */
-
-  uart_pollnotify(dev, POLLOUT);
 }
 
 /************************************************************************************
@@ -1716,6 +1716,10 @@ void uart_connected(FAR uart_dev_t *dev, bool connected)
   dev->disconnected = !connected;
   if (!connected)
     {
+      /* Notify all poll/select waiters that a hangup occurred */
+
+      uart_pollnotify(dev, (POLLERR | POLLHUP));
+
       /* Yes.. wake up all waiting threads.  Each thread should detect the
        * disconnection and return the ENOTCONN error.
        */
@@ -1739,10 +1743,6 @@ void uart_connected(FAR uart_dev_t *dev, bool connected)
           dev->recvwaiting = false;
           nxsem_post(&dev->recvsem);
         }
-
-      /* Notify all poll/select waiters that a hangup occurred */
-
-      uart_pollnotify(dev, (POLLERR | POLLHUP));
     }
 
   leave_critical_section(flags);
