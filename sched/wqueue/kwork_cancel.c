@@ -77,18 +77,30 @@ static int work_qcancel(FAR struct kwork_wqueue_s *wqueue,
   flags = enter_critical_section();
   if (work->worker != NULL)
     {
-      /* A little test of the integrity of the work queue */
-
-      DEBUGASSERT(work->dq.flink != NULL ||
-                  (FAR dq_entry_t *)work == wqueue->q.tail);
-      DEBUGASSERT(work->dq.blink != NULL ||
-                  (FAR dq_entry_t *)work == wqueue->q.head);
-
       /* Remove the entry from the work queue and make sure that it is
        * marked as available (i.e., the worker field is nullified).
        */
 
-      dq_rem((FAR dq_entry_t *)work, &wqueue->q);
+      if (WDOG_ISACTIVE(&work->timer))
+        {
+          wd_cancel(&work->timer);
+        }
+      else
+        {
+          /* The sem_wait() can't call from interrupt handlers, so worker
+           * thread will still be awakened even if the work cancel is
+           * called in interrupt handlers, but work thread can handle
+           * this case with work empty in the work queue.
+           */
+
+          if (up_interrupt_context() == false)
+            {
+              nxsem_wait(&wqueue->sem);
+            }
+
+          sq_rem((FAR sq_entry_t *)work, &wqueue->q);
+        }
+
       work->worker = NULL;
       ret = OK;
     }
